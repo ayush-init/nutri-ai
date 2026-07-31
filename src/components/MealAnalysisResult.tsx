@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Info, Flame, Heart, Dumbbell, Wheat, Droplets, Sun, ShieldAlert, RotateCcw, PackageCheck, Store, Layers, AlertTriangle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
+import { Info, Flame, Heart, Dumbbell, Wheat, Droplets, Sun, ShieldAlert, RotateCcw, PackageCheck, Store, Layers, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { MealAnalysis, MealRecord, ARCalloutItem } from '@/types/tracker';
 import { InteractiveARCallout } from '@/components/InteractiveARCallout';
 
@@ -21,7 +21,7 @@ export const MealAnalysisResult: React.FC<MealAnalysisResultProps> = ({
   const [arAnnotations, setArAnnotations] = useState<ARCalloutItem[] | null>(null);
   const [isGeneratingAR, setIsGeneratingAR] = useState<boolean>(false);
 
-  // Generate AR Spatial Annotation on Demand
+  // Generate AR Spatial Annotation on Demand passing exact detected items
   const handleGenerateAR = async () => {
     if (!imageUrl) return;
     setIsGeneratingAR(true);
@@ -30,7 +30,11 @@ export const MealAnalysisResult: React.FC<MealAnalysisResultProps> = ({
       const res = await fetch('/api/annotate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageUrl }),
+        body: JSON.stringify({
+          image: imageUrl,
+          items: analysis.items,
+          mealName: analysis.mealName,
+        }),
       });
 
       const data = await res.json();
@@ -128,18 +132,12 @@ export const MealAnalysisResult: React.FC<MealAnalysisResultProps> = ({
             <button
               onClick={handleGenerateAR}
               disabled={isGeneratingAR}
-              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs sm:text-sm tracking-wide shadow-lg shadow-emerald-600/20 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm tracking-wide shadow-md shadow-emerald-600/10 active:scale-[0.99] transition-all flex items-center justify-center text-center"
             >
               {isGeneratingAR ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-200" />
-                  <span>Extracting AR Spatial Food Contours & Badges...</span>
-                </>
+                <span>Generating Ingredient Callout Photo...</span>
               ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-emerald-300" />
-                  <span>✨ Generate Interactive AR Food Callout View</span>
-                </>
+                <span>Generate Ingredient Callout Photo</span>
               )}
             </button>
           ) : (

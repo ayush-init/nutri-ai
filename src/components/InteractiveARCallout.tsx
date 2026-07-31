@@ -82,7 +82,31 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
 
   const layoutItems = resolveLayoutCollisions(annotations);
 
-  // High-Resolution Export with Edge Margin Padding (Prevents Text Cropping!)
+  // Helper for multi-line text wrapping on HTML5 Canvas
+  const wrapCanvasText = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxWidth: number
+  ): string[] => {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = words[0];
+
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const width = ctx.measureText(currentLine + ' ' + word).width;
+      if (width < maxWidth) {
+        currentLine += ' ' + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    lines.push(currentLine);
+    return lines;
+  };
+
+  // High-Resolution Export with Multi-Line Canvas Wrapping
   const handleExportCleanPhoto = async () => {
     if (!containerRef.current) return;
 
@@ -104,12 +128,14 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
         ctx.drawImage(img, 0, 0, w, h);
 
         // Dynamically scale font & line geometry based on canvas width
-        const fontSize = Math.max(22, Math.round(w / 42));
+        const fontSize = Math.max(20, Math.round(w / 48));
         const dotRadius = Math.max(8, Math.round(w / 120));
         const lineWidth = Math.max(3, Math.round(w / 350));
-        const pillHeight = fontSize * 1.8;
+        const lineSpacing = fontSize * 1.25;
         const pillPaddingX = fontSize * 0.8;
-        const marginPadding = Math.round(w / 40); // Safe inner padding from canvas borders
+        const pillPaddingY = fontSize * 0.5;
+        const maxTextWidth = Math.round(w / 6.5); // Max width per line before wrapping
+        const marginPadding = Math.round(w / 40);
 
         ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
 
@@ -118,16 +144,24 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
           const dotY = (target.y / 1000) * h;
 
           const labelText = item.name;
-          const textMetrics = ctx.measureText(labelText);
-          const textWidth = textMetrics.width;
-          const pillWidth = textWidth + pillPaddingX * 2;
+          const lines = wrapCanvasText(ctx, labelText, maxTextWidth);
 
-          // Compute clamped badge position so text is NEVER cropped at left or right canvas edges!
+          // Calculate wrapped box dimensions
+          let maxLineWidth = 0;
+          lines.forEach((l) => {
+            const lw = ctx.measureText(l).width;
+            if (lw > maxLineWidth) maxLineWidth = lw;
+          });
+
+          const pillWidth = maxLineWidth + pillPaddingX * 2;
+          const pillHeight = lines.length * lineSpacing + pillPaddingY * 2;
+
+          // Compute clamped badge position so text stays inside canvas borders
           let badgeX = (pos.x / 1000) * w;
           if (pos.x < 500) {
-            badgeX = Math.max(marginPadding, Math.min(dotX - 50, badgeX));
+            badgeX = Math.max(marginPadding, Math.min(dotX - 40, badgeX));
           } else {
-            badgeX = Math.min(w - pillWidth - marginPadding, Math.max(dotX + 50, badgeX));
+            badgeX = Math.min(w - pillWidth - marginPadding, Math.max(dotX + 40, badgeX));
           }
 
           let badgeY = (pos.y / 1000) * h;
@@ -143,7 +177,7 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
           ctx.lineWidth = Math.max(1.5, lineWidth / 2);
           ctx.stroke();
 
-          // Leader line connected to inner edge of badge
+          // Leader line connected to badge edge
           const lineX = pos.x < 500 ? badgeX + pillWidth : badgeX;
           const lineY = badgeY + pillHeight / 2;
 
@@ -154,19 +188,23 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
           ctx.lineTo(lineX, lineY);
           ctx.stroke();
 
-          // White pill badge
+          // White pill badge background
           ctx.fillStyle = '#ffffff';
           ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
           ctx.shadowBlur = Math.round(w / 100);
           ctx.beginPath();
-          ctx.roundRect(badgeX, badgeY, pillWidth, pillHeight, pillHeight / 2);
+          ctx.roundRect(badgeX, badgeY, pillWidth, pillHeight, Math.min(pillHeight / 2, 20));
           ctx.fill();
 
-          // Text label
+          // Draw wrapped lines of text
           ctx.fillStyle = '#0f172a'; // Slate 900
           ctx.shadowColor = 'transparent';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(labelText, badgeX + pillPaddingX, badgeY + pillHeight / 2 + 1);
+          ctx.textBaseline = 'top';
+
+          lines.forEach((lineStr, lineIdx) => {
+            const textY = badgeY + pillPaddingY + lineIdx * lineSpacing;
+            ctx.fillText(lineStr, badgeX + pillPaddingX, textY);
+          });
         });
 
         // Trigger browser download
@@ -206,11 +244,11 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
         </button>
       </div>
 
-      {/* Photo Viewport: Natural Image Aspect Ratio Wrapper (Eliminates Black Sidebars!) */}
+      {/* Photo Viewport: Natural Image Aspect Ratio Wrapper */}
       <div className="w-full flex items-center justify-center p-2 sm:p-4 bg-slate-950">
         <div ref={containerRef} className="relative inline-block max-w-full max-h-[650px] rounded-2xl overflow-hidden shadow-2xl">
           
-          {/* Base Photo rendered naturally without letterboxing */}
+          {/* Base Photo */}
           <img
             src={imageUrl}
             alt={mealName}
