@@ -33,7 +33,7 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
     return { x: 500, y: 500 };
   };
 
-  // Helper to compute initial badge position
+  // Helper to compute initial badge position (0-1000 scale)
   const getInitialBadgePos = (item: ARCalloutItem) => {
     if (item.badgeAnchor && item.badgeAnchor.x && item.badgeAnchor.y) {
       return item.badgeAnchor;
@@ -41,14 +41,14 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
     const target = getTargetDot(item);
     const isLeft = target.x < 500;
     return {
-      x: isLeft ? Math.max(50, target.x - 220) : Math.min(920, target.x + 200),
-      y: Math.max(50, Math.min(950, target.y)),
+      x: isLeft ? Math.max(20, target.x - 220) : Math.min(780, target.x + 180),
+      y: Math.max(60, Math.min(920, target.y)),
     };
   };
 
   // Frontend Collision Avoidance Pass: Resolves Y-axis overlaps on left and right sides
   const resolveLayoutCollisions = (items: ARCalloutItem[]) => {
-    const minVerticalGap = 80; // Minimum 80 points (8% height) vertical gap between badges
+    const minVerticalGap = 85; // 8.5% height vertical gap between badges
 
     const itemsWithPos = items.map((item) => ({
       item,
@@ -82,7 +82,7 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
 
   const layoutItems = resolveLayoutCollisions(annotations);
 
-  // Export clean annotated image
+  // High-Resolution Export with Edge Margin Padding (Prevents Text Cropping!)
   const handleExportCleanPhoto = async () => {
     if (!containerRef.current) return;
 
@@ -92,59 +92,84 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
       img.crossOrigin = 'anonymous';
 
       img.onload = () => {
-        canvas.width = img.naturalWidth || 1200;
-        canvas.height = img.naturalHeight || 900;
+        const w = img.naturalWidth || 1200;
+        const h = img.naturalHeight || 900;
+        canvas.width = w;
+        canvas.height = h;
+
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Draw base uploaded photo
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Draw base photo
+        ctx.drawImage(img, 0, 0, w, h);
 
-        // Draw static white target dots, leader lines, and non-overlapping pill badges
+        // Dynamically scale font & line geometry based on canvas width
+        const fontSize = Math.max(22, Math.round(w / 42));
+        const dotRadius = Math.max(8, Math.round(w / 120));
+        const lineWidth = Math.max(3, Math.round(w / 350));
+        const pillHeight = fontSize * 1.8;
+        const pillPaddingX = fontSize * 0.8;
+        const marginPadding = Math.round(w / 40); // Safe inner padding from canvas borders
+
+        ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+
         layoutItems.forEach(({ item, target, pos }) => {
-          const dotX = (target.x / 1000) * canvas.width;
-          const dotY = (target.y / 1000) * canvas.height;
+          const dotX = (target.x / 1000) * w;
+          const dotY = (target.y / 1000) * h;
 
-          const badgeX = (pos.x / 1000) * canvas.width;
-          const badgeY = (pos.y / 1000) * canvas.height;
+          const labelText = item.name;
+          const textMetrics = ctx.measureText(labelText);
+          const textWidth = textMetrics.width;
+          const pillWidth = textWidth + pillPaddingX * 2;
 
-          // Target dot on food
+          // Compute clamped badge position so text is NEVER cropped at left or right canvas edges!
+          let badgeX = (pos.x / 1000) * w;
+          if (pos.x < 500) {
+            badgeX = Math.max(marginPadding, Math.min(dotX - 50, badgeX));
+          } else {
+            badgeX = Math.min(w - pillWidth - marginPadding, Math.max(dotX + 50, badgeX));
+          }
+
+          let badgeY = (pos.y / 1000) * h;
+          badgeY = Math.max(marginPadding, Math.min(h - pillHeight - marginPadding, badgeY));
+
+          // Target dot on food ingredient
           ctx.fillStyle = '#ffffff';
           ctx.beginPath();
-          ctx.arc(dotX, dotY, Math.max(6, Math.round(canvas.width / 200)), 0, Math.PI * 2);
+          ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = Math.max(1.5, lineWidth / 2);
           ctx.stroke();
 
-          // Leader line
+          // Leader line connected to inner edge of badge
+          const lineX = pos.x < 500 ? badgeX + pillWidth : badgeX;
+          const lineY = badgeY + pillHeight / 2;
+
           ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = Math.max(2, Math.round(canvas.width / 450));
+          ctx.lineWidth = lineWidth;
           ctx.beginPath();
           ctx.moveTo(dotX, dotY);
-          ctx.lineTo(badgeX + 50, badgeY + 14);
+          ctx.lineTo(lineX, lineY);
           ctx.stroke();
 
           // White pill badge
-          ctx.font = 'bold 16px system-ui, sans-serif';
-          const labelText = item.name;
-          const textWidth = ctx.measureText(labelText).width;
-          const pillWidth = textWidth + 24;
-          const pillHeight = 32;
-
           ctx.fillStyle = '#ffffff';
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-          ctx.shadowBlur = 8;
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+          ctx.shadowBlur = Math.round(w / 100);
           ctx.beginPath();
-          ctx.roundRect(badgeX, badgeY, pillWidth, pillHeight, 16);
+          ctx.roundRect(badgeX, badgeY, pillWidth, pillHeight, pillHeight / 2);
           ctx.fill();
 
-          ctx.fillStyle = '#0f172a';
+          // Text label
+          ctx.fillStyle = '#0f172a'; // Slate 900
           ctx.shadowColor = 'transparent';
-          ctx.fillText(labelText, badgeX + 12, badgeY + 21);
+          ctx.textBaseline = 'middle';
+          ctx.fillText(labelText, badgeX + pillPaddingX, badgeY + pillHeight / 2 + 1);
         });
 
+        // Trigger browser download
         const dataUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = `NUTRI_AI_Annotated_${mealName.replace(/\s+/g, '_')}.png`;
@@ -159,10 +184,10 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
   };
 
   return (
-    <div className="relative w-full rounded-3xl overflow-hidden bg-slate-900 border border-slate-200 shadow-xl mb-6">
+    <div className="relative w-full rounded-3xl overflow-hidden bg-white border border-slate-200 shadow-xl mb-6">
       
       {/* Top Header Bar */}
-      <div className="p-3 px-5 bg-white border-b border-slate-200 flex items-center justify-between">
+      <div className="p-3 px-5 bg-white border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="p-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200">
             <Sparkles className="w-3.5 h-3.5" />
@@ -174,75 +199,78 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
 
         <button
           onClick={handleExportCleanPhoto}
-          className="px-3 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] transition-all flex items-center gap-1.5 shadow-xs"
+          className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-xs"
         >
-          <Download className="w-3 h-3" />
+          <Download className="w-3.5 h-3.5" />
           <span>Save Image</span>
         </button>
       </div>
 
-      {/* Photo Viewport with Non-Overlapping Outer Badges */}
-      <div ref={containerRef} className="relative w-full aspect-square sm:aspect-video max-h-[550px] flex items-center justify-center overflow-hidden bg-slate-950">
-        
-        {/* Base Photo */}
-        <img
-          src={imageUrl}
-          alt={mealName}
-          className="w-full h-full object-contain"
-        />
+      {/* Photo Viewport: Natural Image Aspect Ratio Wrapper (Eliminates Black Sidebars!) */}
+      <div className="w-full flex items-center justify-center p-2 sm:p-4 bg-slate-950">
+        <div ref={containerRef} className="relative inline-block max-w-full max-h-[650px] rounded-2xl overflow-hidden shadow-2xl">
+          
+          {/* Base Photo rendered naturally without letterboxing */}
+          <img
+            src={imageUrl}
+            alt={mealName}
+            className="block max-w-full max-h-[600px] w-auto h-auto object-contain rounded-2xl"
+          />
 
-        {/* SVG Static Non-Overlapping Leader Lines Layer */}
-        {layoutItems.length > 0 && (
-          <svg
-            viewBox="0 0 1000 1000"
-            preserveAspectRatio="none"
-            className="absolute inset-0 w-full h-full pointer-events-none z-10"
-          >
-            {layoutItems.map(({ item, target, pos }) => (
-              <g key={item.id}>
-                {/* Leader Line */}
-                <line
-                  x1={target.x}
-                  y1={target.y}
-                  x2={pos.x + (pos.x < 500 ? 80 : 10)}
-                  y2={pos.y + 15}
-                  stroke="#ffffff"
-                  strokeWidth="2.5"
-                  strokeOpacity="0.95"
-                />
-                {/* Static Target Dot on Food */}
-                <circle
-                  cx={target.x}
-                  cy={target.y}
-                  r="7"
-                  fill="#ffffff"
-                  stroke="rgba(0,0,0,0.4)"
-                  strokeWidth="1.5"
-                />
-              </g>
-            ))}
-          </svg>
-        )}
-
-        {/* Static Small Non-Truncated White Pill Badges Positioned Non-Overlappingly */}
-        {layoutItems.map(({ item, pos }) => {
-          const badgeX = (pos.x / 10).toFixed(2) + '%';
-          const badgeY = (pos.y / 10).toFixed(2) + '%';
-
-          return (
-            <div
-              key={item.id}
-              style={{ top: badgeY, left: badgeX }}
-              className="absolute z-20"
+          {/* SVG Leader Lines Layer snapped 1-to-1 to photo dimensions */}
+          {layoutItems.length > 0 && (
+            <svg
+              viewBox="0 0 1000 1000"
+              preserveAspectRatio="none"
+              className="absolute inset-0 w-full h-full pointer-events-none z-10"
             >
-              {/* Compact Non-Truncated White Pill Badge with Multi-Line Text Wrapping */}
-              <div className="px-3 py-1.5 rounded-2xl bg-white text-slate-900 border border-slate-200/90 shadow-lg font-extrabold text-[10px] sm:text-xs whitespace-normal max-w-[130px] sm:max-w-[170px] leading-tight flex items-center">
-                <span>{item.name}</span>
-              </div>
-            </div>
-          );
-        })}
+              {layoutItems.map(({ item, target, pos }) => (
+                <g key={item.id}>
+                  {/* Leader Line */}
+                  <line
+                    x1={target.x}
+                    y1={target.y}
+                    x2={pos.x < 500 ? Math.max(5, pos.x + 30) : Math.min(995, pos.x)}
+                    y2={pos.y + 15}
+                    stroke="#ffffff"
+                    strokeWidth="3.5"
+                    strokeOpacity="0.95"
+                  />
+                  {/* Static Target Dot on Food */}
+                  <circle
+                    cx={target.x}
+                    cy={target.y}
+                    r="8"
+                    fill="#ffffff"
+                    stroke="rgba(0,0,0,0.4)"
+                    strokeWidth="2"
+                  />
+                </g>
+              ))}
+            </svg>
+          )}
 
+          {/* Clamped White Pill Badges Positioned 1-to-1 on Photo Frame */}
+          {layoutItems.map(({ item, pos }) => {
+            const isLeft = pos.x < 500;
+            const badgeX = isLeft ? `${Math.max(1, pos.x / 10).toFixed(2)}%` : `${Math.min(72, pos.x / 10).toFixed(2)}%`;
+            const badgeY = `${(pos.y / 10).toFixed(2)}%`;
+
+            return (
+              <div
+                key={item.id}
+                style={{ top: badgeY, left: badgeX }}
+                className="absolute z-20"
+              >
+                {/* Proportional White Pill Badge */}
+                <div className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white text-slate-900 border border-slate-200/90 shadow-2xl font-extrabold text-[10px] sm:text-xs whitespace-normal max-w-[120px] sm:max-w-[160px] leading-tight flex items-center">
+                  <span>{item.name}</span>
+                </div>
+              </div>
+            );
+          })}
+
+        </div>
       </div>
 
     </div>
