@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Info, Flame, Heart, Dumbbell, Wheat, Droplets, Sun, ShieldAlert, RotateCcw, PackageCheck, Store, Layers, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { MealAnalysis, MealRecord } from '@/types/tracker';
+import { Info, Flame, Heart, Dumbbell, Wheat, Droplets, Sun, ShieldAlert, RotateCcw, PackageCheck, Store, Layers, AlertTriangle, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
+import { MealAnalysis, MealRecord, ARCalloutItem } from '@/types/tracker';
+import { InteractiveARCallout } from '@/components/InteractiveARCallout';
 
 interface MealAnalysisResultProps {
   analysis: MealAnalysis;
@@ -17,6 +18,31 @@ export const MealAnalysisResult: React.FC<MealAnalysisResultProps> = ({
   imageUrl,
   onCancel,
 }) => {
+  const [arAnnotations, setArAnnotations] = useState<ARCalloutItem[] | null>(null);
+  const [isGeneratingAR, setIsGeneratingAR] = useState<boolean>(false);
+
+  // Generate AR Spatial Annotation on Demand
+  const handleGenerateAR = async () => {
+    if (!imageUrl) return;
+    setIsGeneratingAR(true);
+
+    try {
+      const res = await fetch('/api/annotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageUrl }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.annotations) {
+        setArAnnotations(data.annotations);
+      }
+    } catch (e) {
+      console.error('Failed to generate AR annotations:', e);
+    } finally {
+      setIsGeneratingAR(false);
+    }
+  };
 
   // Non-Food Image Rejection View
   if (!analysis.isFood || analysis.domainType === 'non_food') {
@@ -82,16 +108,54 @@ export const MealAnalysisResult: React.FC<MealAnalysisResultProps> = ({
   const uncertainty = analysis.uncertaintyLevel || 'LOW';
   const imgQuality = analysis.visionMetadata?.imageQuality || 'GOOD';
 
+  // Dynamic Rule: Show AR Callout option ONLY if meal has MULTIPLE distinct food items & is NOT a packaged good
+  const itemCount = analysis.items ? analysis.items.length : 0;
+  const isMultiItemMeal = analysis.domainType === 'multi_dish_platter' || itemCount > 1;
+  const isPackagedFood = analysis.domainType === 'packaged_food';
+
+  const showAROption = imageUrl && isMultiItemMeal && !isPackagedFood;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md mb-8"
     >
+      {/* Dynamic Interactive AR Callout View Section */}
+      {showAROption && (
+        <div className="mb-6">
+          {!arAnnotations ? (
+            <button
+              onClick={handleGenerateAR}
+              disabled={isGeneratingAR}
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs sm:text-sm tracking-wide shadow-lg shadow-emerald-600/20 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+            >
+              {isGeneratingAR ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-200" />
+                  <span>Extracting AR Spatial Food Contours & Badges...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-emerald-300" />
+                  <span>✨ Generate Interactive AR Food Callout View</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <InteractiveARCallout
+              imageUrl={imageUrl}
+              annotations={arAnnotations}
+              mealName={analysis.mealName}
+            />
+          )}
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
         <div className="flex items-center gap-4">
-          {imageUrl && (
+          {imageUrl && !arAnnotations && (
             <img
               src={imageUrl}
               alt="Scanned Food"

@@ -30,6 +30,40 @@ export type HealthFlagType =
   | 'REFINED_FLOUR'
   | 'HIGH_SATURATED_FAT';
 
+export interface ARPolygonPoint {
+  y: number; // 0 - 1000
+  x: number; // 0 - 1000
+}
+
+export interface ARCalloutItem {
+  id: string;
+  badgeNumber: number;
+  colorHex: string;
+  name: string;               // Concise food name only
+  portionText?: string;
+  calories?: number;
+  polygon_2d?: ARPolygonPoint[];
+  leaderAnchor?: {
+    y: number; // 0 - 1000
+    x: number; // 0 - 1000
+  };
+  targetAnchor?: {
+    y: number; // 0 - 1000
+    x: number; // 0 - 1000
+  };
+  badgeAnchor?: {
+    y: number; // 0 - 1000
+    x: number; // 0 - 1000
+  };
+  cardPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'middle-left' | 'middle-right';
+}
+
+export interface ARAnnotationResponse {
+  success: boolean;
+  annotations: ARCalloutItem[];
+  error?: string;
+}
+
 export interface MealItem {
   id: string;
   name: string;
@@ -39,6 +73,7 @@ export interface MealItem {
   carbsGrams: number;
   fatGrams: number;
   confidence: number;
+  box_2d?: [number, number, number, number];
 }
 
 export interface UniversalNutrition {
@@ -52,10 +87,10 @@ export interface UniversalNutrition {
 }
 
 export interface MultiDimensionalConfidence {
-  foodRecognitionConfidence: number; // 0.0 - 1.0
-  portionConfidence: number;         // 0.0 - 1.0
-  nutritionConfidence: number;       // 0.0 - 1.0
-  overallConfidence: number;          // 0.0 - 1.0
+  foodRecognitionConfidence: number;
+  portionConfidence: number;
+  nutritionConfidence: number;
+  overallConfidence: number;
 }
 
 export interface VisionMetadata {
@@ -114,7 +149,6 @@ export interface MealAnalysis {
   healthFlags: HealthFlagType[];
   domainMetadata?: DomainMetadata;
 
-  // Legacy compatibility fields
   totalCalories?: number;
   totalProtein?: number;
   totalCarbs?: number;

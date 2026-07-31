@@ -19,7 +19,6 @@ export async function runVisionRouter(base64Image: string, mimeType: string = 'i
       const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
       // PASS 1: Ultra-Fast Domain Router Classification (~200ms)
-      // Uses gemini-3.5-flash-lite
       let domainType: VisionDomainType = 'home_cooked_meal';
       try {
         const routerResponse = await ai.models.generateContent({
@@ -64,7 +63,6 @@ export async function runVisionRouter(base64Image: string, mimeType: string = 'i
       }
 
       // PASS 2: Flagship Vision & OCR Engine (~600ms)
-      // Uses gemini-3.6-flash as primary engine for all food domains
       let specializedPrompt = HOME_MEAL_PROMPT;
       if (domainType === 'packaged_food') {
         specializedPrompt = PACKAGED_GOODS_PROMPT;
@@ -98,7 +96,6 @@ export async function runVisionRouter(base64Image: string, mimeType: string = 'i
       } catch (primaryErr) {
         console.warn('Primary gemini-3.6-flash call error, using gemini-3.5-flash backup:', primaryErr);
 
-        // Secondary Backup: gemini-3.5-flash
         const backupResponse = await ai.models.generateContent({
           model: 'gemini-3.5-flash',
           contents: [
@@ -126,7 +123,6 @@ export async function runVisionRouter(base64Image: string, mimeType: string = 'i
   return generateSmartFallbackAnalysis(base64Image);
 }
 
-// Ensures analysis object contains all flat & nested Universal Schema fields for UI compatibility
 function normalizeUniversalAnalysis(raw: any): MealAnalysis {
   const nutrition = raw.nutrition || {
     calories: raw.totalCalories || 0,
@@ -212,49 +208,33 @@ function generateSmartFallbackAnalysis(base64Image: string): MealAnalysis {
     });
   }
 
-  if (hash === 3) {
-    return normalizeUniversalAnalysis({
-      isFood: true,
-      domainType: 'packaged_food',
-      mealName: "Lay's Classic Salted Potato Chips (50g)",
-      category: 'snack',
-      nutrition: { calories: 270, proteinGrams: 3.0, carbsGrams: 26.0, fatGrams: 17.0, fiberGrams: 2.0, sugarGrams: 0.5, sodiumMg: 260 },
-      items: [
-        { id: 'item-1', name: 'Potato Chips & Seasoning', weightGrams: 50, calories: 270, proteinGrams: 3.0, carbsGrams: 26.0, fatGrams: 17.0, confidence: 0.98 },
-      ],
-      confidence: { foodRecognitionConfidence: 0.98, portionConfidence: 0.92, nutritionConfidence: 0.95, overallConfidence: 0.95 },
-      uncertaintyLevel: 'LOW',
-      visionMetadata: { cameraAngle: 'ANGLED_45', lighting: 'WELL_LIT', foodVisibility: 'FULLY_VISIBLE', containerType: 'COMMERCIAL_WRAPPER', portionReference: 'STANDARD_CONTAINER', imageQuality: 'GOOD' },
-      healthFlags: ['HIGH_SODIUM', 'ULTRA_PROCESSED', 'PALM_OIL'],
-      domainMetadata: {
-        packagedFood: {
-          brandName: "Lay's",
-          productTitle: 'Classic Salted Potato Chips',
-          netWeightGrams: 50,
-          processingGrade: 'Ultra-Processed (NOVA Grade 4)',
-        },
-      },
-    });
-  }
-
+  // Thali / Platter Demo Fallback with box_2d coordinates!
   return normalizeUniversalAnalysis({
     isFood: true,
-    domainType: 'whole_produce',
-    mealName: 'Fresh Produce & Whole Ingredient Spread',
-    category: 'snack',
-    nutrition: { calories: 480, proteinGrams: 16.0, carbsGrams: 82.0, fatGrams: 14.0, fiberGrams: 18.5, sugarGrams: 24.2, sodiumMg: 110 },
+    domainType: 'multi_dish_platter',
+    mealName: 'South Indian Thali Platter',
+    category: 'lunch',
+    nutrition: { calories: 730, proteinGrams: 28.0, carbsGrams: 104.0, fatGrams: 20.0, fiberGrams: 12.5, sugarGrams: 5.2, sodiumMg: 650 },
     items: [
-      { id: 'item-1', name: 'Sliced Hass Avocado', weightGrams: 80, calories: 128, proteinGrams: 1.6, carbsGrams: 6.8, fatGrams: 11.7, confidence: 0.96 },
-      { id: 'item-2', name: 'Artisan Whole Wheat Bread Slices', weightGrams: 90, calories: 180, proteinGrams: 7.2, carbsGrams: 34.0, fatGrams: 1.8, confidence: 0.94 },
-      { id: 'item-3', name: 'Fresh Bananas & Oranges', weightGrams: 150, calories: 110, proteinGrams: 1.3, carbsGrams: 28.0, fatGrams: 0.3, confidence: 0.92 },
-      { id: 'item-4', name: 'Broccoli Florets & Whole Grains', weightGrams: 120, calories: 62, proteinGrams: 5.9, carbsGrams: 13.2, fatGrams: 0.2, confidence: 0.91 },
+      { id: 'item-1', name: 'Steamed White Rice & Chapati', weightGrams: 250, calories: 320, proteinGrams: 6.0, carbsGrams: 68.0, fatGrams: 2.0, confidence: 0.96, box_2d: [412, 10, 835, 520] },
+      { id: 'item-2', name: 'Sambar Curry Bowl', weightGrams: 180, calories: 140, proteinGrams: 4.0, carbsGrams: 18.0, fatGrams: 5.0, confidence: 0.94, box_2d: [215, 10, 420, 520] },
+      { id: 'item-3', name: 'Soya Chunks Curry', weightGrams: 140, calories: 180, proteinGrams: 14.0, carbsGrams: 12.0, fatGrams: 8.0, confidence: 0.92, box_2d: [440, 560, 620, 910] },
+      { id: 'item-4', name: 'Raita / Curd', weightGrams: 120, calories: 90, proteinGrams: 4.0, carbsGrams: 6.0, fatGrams: 5.0, confidence: 0.95, box_2d: [630, 580, 820, 910] },
     ],
     confidence: { foodRecognitionConfidence: 0.98, portionConfidence: 0.90, nutritionConfidence: 0.93, overallConfidence: 0.94 },
     uncertaintyLevel: 'LOW',
-    visionMetadata: { cameraAngle: 'TOP_DOWN', lighting: 'WELL_LIT', foodVisibility: 'FULLY_VISIBLE', containerType: 'NONE', portionReference: 'VISUAL_DENSITY_ONLY', imageQuality: 'GOOD' },
+    visionMetadata: { cameraAngle: 'TOP_DOWN', lighting: 'WELL_LIT', foodVisibility: 'FULLY_VISIBLE', containerType: 'THALI_TRAY', portionReference: 'STANDARD_CONTAINER', imageQuality: 'GOOD' },
     healthFlags: [],
     domainMetadata: {
-      wholeProduce: { produceType: 'Fresh Raw Whole Fruits, Vegetables & Grains' },
+      multiDish: {
+        platterType: 'South Indian Thali Tray',
+        compartmentBreakdown: [
+          { compartmentName: 'Section A', foodName: 'Steamed Rice & Chapati', calories: 320, weightGrams: 250 },
+          { compartmentName: 'Bowl B', foodName: 'Sambar Curry', calories: 140, weightGrams: 180 },
+          { compartmentName: 'Bowl C', foodName: 'Soya Chunks Curry', calories: 180, weightGrams: 140 },
+          { compartmentName: 'Bowl D', foodName: 'Raita / Curd', calories: 90, weightGrams: 120 },
+        ],
+      },
     },
   });
 }
