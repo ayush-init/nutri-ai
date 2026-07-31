@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Info, Flame, Heart, Dumbbell, Wheat, Droplets, Sun, ShieldAlert, RotateCcw, PackageCheck, Store, Layers, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Info, Flame, Dumbbell, Wheat, Droplets, Sun, ShieldAlert, RotateCcw, PackageCheck, Store, Layers, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { MealAnalysis, MealRecord, ARCalloutItem } from '@/types/tracker';
 import { InteractiveARCallout } from '@/components/InteractiveARCallout';
 
@@ -100,9 +100,6 @@ export const MealAnalysisResult: React.FC<MealAnalysisResultProps> = ({
   const carbs = analysis.nutrition?.carbsGrams ?? analysis.totalCarbs ?? 0;
   const fat = analysis.nutrition?.fatGrams ?? analysis.totalFat ?? 0;
 
-  const proteinRatio = (protein * 4) / (calories || 1);
-  const healthScore = Math.min(Math.max(Math.round(6 + proteinRatio * 8), 5), 10);
-
   const brand = analysis.domainMetadata?.packagedFood?.brandName || analysis.brandName;
   const productTitle = analysis.domainMetadata?.packagedFood?.productTitle || analysis.productTitle;
   const restaurantChain = analysis.domainMetadata?.fastFood?.restaurantChain || analysis.restaurantChain;
@@ -189,11 +186,6 @@ export const MealAnalysisResult: React.FC<MealAnalysisResultProps> = ({
                   : 'bg-rose-50 text-rose-700 border-rose-200'
               }`}>
                 <CheckCircle2 className="w-3 h-3" /> {uncertainty} Uncertainty
-              </span>
-
-              {/* Health Score */}
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                <Heart className="w-3 h-3 fill-amber-500 text-amber-500" /> Health Score: {healthScore}/10
               </span>
             </div>
 

@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from '@/components/Navbar';
 import { MealAnalysisResult } from '@/components/MealAnalysisResult';
+import { AIScannerViewer } from '@/components/AIScannerViewer';
 import { MealAnalysis } from '@/types/tracker';
 import { compressImageBase64 } from '@/lib/imageCompressor';
-import { Camera, Upload, Sparkles, RefreshCw, FlipHorizontal, AlertCircle, Sun, Utensils, RotateCcw } from 'lucide-react';
+import { Camera, Upload, FlipHorizontal } from 'lucide-react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'camera' | 'upload'>('upload');
@@ -22,7 +22,7 @@ export default function Home() {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
 
   useEffect(() => {
-    if (activeTab === 'camera') {
+    if (activeTab === 'camera' && !selectedImage) {
       startCamera();
     } else {
       stopCamera();
@@ -30,7 +30,7 @@ export default function Home() {
     return () => {
       stopCamera();
     };
-  }, [activeTab, facingMode]);
+  }, [activeTab, facingMode, selectedImage]);
 
   const startCamera = async () => {
     stopCamera();
@@ -204,6 +204,7 @@ export default function Home() {
     setAnalysisResult(null);
     setErrorReason(null);
     setQualityWarning(null);
+    setIsAnalyzing(false);
     if (activeTab === 'camera') {
       startCamera();
     }
@@ -215,172 +216,123 @@ export default function Home() {
       {/* Header */}
       <Navbar onOpenScanner={() => handleReset()} />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         
-        {/* Title Hero */}
+        {/* Clean Hero Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 mb-3">
-            <Sparkles className="w-3.5 h-3.5" /> NUTRI.AI Multi-Model Vision
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             Upload or Snap Food Photo
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-lg mx-auto font-medium">
-            Take a photo or upload an image to receive instant AI vision analysis, calorie calculation, and micronutrient breakdown.
+          <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto font-medium leading-relaxed">
+            Take a photo or upload an image to receive instant AI vision analysis, calorie calculation, and nutrition breakdown.
           </p>
         </div>
 
-        {/* Scanner Card Area */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-8">
+        {/* Main Scanner Container */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs mb-8">
           
-          {/* Mode Selector Tabs */}
-          <div className="grid grid-cols-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold mb-6">
-            <button
-              onClick={() => {
-                setActiveTab('upload');
-                handleReset();
-              }}
-              className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${
-                activeTab === 'upload'
-                  ? 'bg-white text-emerald-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Upload className="w-4 h-4" /> Upload Image
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('camera');
-                handleReset();
-              }}
-              className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${
-                activeTab === 'camera'
-                  ? 'bg-white text-emerald-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Camera className="w-4 h-4" /> Live Camera
-            </button>
-          </div>
+          {/* Mode Selector Tabs (Hidden when an image is selected) */}
+          {!selectedImage && (
+            <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold mb-6">
+              <button
+                onClick={() => {
+                  setActiveTab('upload');
+                  handleReset();
+                }}
+                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${
+                  activeTab === 'upload'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Upload className="w-4 h-4 text-emerald-600" /> Upload Image
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('camera');
+                  handleReset();
+                }}
+                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${
+                  activeTab === 'camera'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Camera className="w-4 h-4 text-emerald-600" /> Live Camera
+              </button>
+            </div>
+          )}
 
-          {/* Upload Dropzone OR Camera View */}
-          {activeTab === 'upload' ? (
+          {/* Render Active Image Scanner Hero Viewer OR File Dropzone / Camera */}
+          {selectedImage ? (
+            <AIScannerViewer
+              imageUrl={selectedImage}
+              isAnalyzing={isAnalyzing}
+              qualityWarning={qualityWarning}
+              errorMsg={errorMsg}
+              onReset={handleReset}
+              onRetry={() => {
+                if (selectedImage) processImageAnalysis(selectedImage);
+              }}
+            />
+          ) : activeTab === 'upload' ? (
+            /* Upload Dropzone Mode */
             <div className="relative aspect-video max-h-96 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-emerald-500 flex flex-col items-center justify-center p-6 text-center transition-all group overflow-hidden">
-              {selectedImage ? (
-                <img src={selectedImage} alt="Uploaded preview" className="w-full h-full object-contain" />
-              ) : (
-                <>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                  />
-                  <div className="p-4 rounded-full bg-emerald-50 text-emerald-600 mb-3 group-hover:scale-110 transition-transform">
-                    <Upload className="w-8 h-8" />
-                  </div>
-                  <p className="text-sm font-bold text-slate-900 mb-1">Click or drag food image here</p>
-                  <p className="text-xs text-slate-500">Supports JPG, PNG, WEBP</p>
-                </>
-              )}
-
-              {/* Scanning Overlay */}
-              {isAnalyzing && (
-                <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center z-20">
-                  <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-2" />
-                  <span className="text-sm font-bold text-slate-900 font-mono">
-                    Analyzing Image & Micronutrients...
-                  </span>
-                </div>
-              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              />
+              <div className="p-4 rounded-full bg-emerald-50 text-emerald-600 mb-3 group-hover:scale-110 transition-transform">
+                <Upload className="w-7 h-7" />
+              </div>
+              <p className="text-sm font-bold text-slate-900 mb-1">Click or drag food image here</p>
+              <p className="text-xs text-slate-500 font-medium">Supports JPG, PNG, WEBP</p>
             </div>
           ) : (
-            /* Camera Viewport */
-            <div className="relative aspect-video max-h-96 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center">
-              {selectedImage ? (
-                <img src={selectedImage} alt="Captured food" className="w-full h-full object-contain" />
-              ) : (
-                <video
-                  ref={videoRef}
-                  playsInline
-                  muted
-                  className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
-                />
-              )}
+            /* Camera Viewport Mode - Clean Light Theme */
+            <div className="relative aspect-video max-h-96 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
+              />
 
-              {!isCameraActive && !selectedImage && (
-                <div className="flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                  <Camera className="w-10 h-10 mb-2 text-slate-600 animate-bounce" />
-                  <p className="text-xs max-w-xs">Initializing camera feed...</p>
-                </div>
-              )}
-
-              {/* Laser scan effect during analysis */}
-              {isAnalyzing && (
-                <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xs flex flex-col items-center justify-center">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-400 shadow-lg shadow-emerald-500 animate-laser" />
-                  <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-lg">
-                    <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
-                    <span className="text-sm font-bold text-slate-900 font-mono">
-                      Running Vision AI Analysis...
-                    </span>
-                  </div>
+              {!isCameraActive && (
+                <div className="flex flex-col items-center justify-center text-center p-6 text-slate-500">
+                  <Camera className="w-10 h-10 mb-2 text-slate-400 animate-bounce" />
+                  <p className="text-xs max-w-xs font-medium">Initializing camera feed...</p>
                 </div>
               )}
 
               {/* Camera Flip button */}
-              {isCameraActive && !isAnalyzing && !selectedImage && (
+              {isCameraActive && (
                 <button
                   onClick={() => setFacingMode(facingMode === 'user' ? 'environment' : 'user')}
-                  className="absolute top-3 right-3 p-2 rounded-xl bg-slate-900/80 text-white border border-slate-700 hover:bg-slate-900"
+                  className="absolute top-3 right-3 p-2 rounded-xl bg-white/90 text-slate-700 border border-slate-200 shadow-md hover:bg-white transition-all"
                 >
                   <FlipHorizontal className="w-4 h-4" />
                 </button>
               )}
+
+              {/* Shutter Button */}
+              {isCameraActive && (
+                <div className="absolute bottom-4 inset-x-0 flex items-center justify-center">
+                  <button
+                    onClick={capturePhoto}
+                    className="px-8 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                  >
+                    <Camera className="w-5 h-5" />
+                    <span>Snap Photo</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Quality Warning banner */}
-          {qualityWarning && (
-            <div className="mt-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2 font-medium">
-              <Sun className="w-4 h-4 shrink-0 text-amber-600" />
-              <span>{qualityWarning}</span>
-            </div>
-          )}
-
-          {/* Error banner */}
-          {errorMsg && (
-            <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* Action Shutter & Reset Buttons */}
-          <div className="mt-4 flex items-center justify-center gap-3">
-            {activeTab === 'camera' && !selectedImage && (
-              <button
-                onClick={capturePhoto}
-                disabled={!isCameraActive || isAnalyzing}
-                className="px-8 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md shadow-emerald-600/20 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all flex items-center gap-2"
-              >
-                <Camera className="w-5 h-5" />
-                <span>Snap Photo</span>
-              </button>
-            )}
-
-            {selectedImage && (
-              <button
-                onClick={handleReset}
-                className="px-6 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-all flex items-center gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>Analyze Another Photo</span>
-              </button>
-            )}
-          </div>
-
-          {/* Sample Preset Photos */}
+          {/* Sample Preset Photos (Only shown when no image is selected) */}
           {!selectedImage && (
             <div className="mt-6 pt-4 border-t border-slate-100">
               <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase mb-2.5 block">
