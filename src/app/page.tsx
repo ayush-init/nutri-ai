@@ -216,24 +216,25 @@ export default function Home() {
       {/* Header */}
       <Navbar onOpenScanner={() => handleReset()} />
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      {/* Main Container - Expanded Width max-w-6xl */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         
         {/* Clean Hero Title */}
         <div className="text-center mb-8">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             Upload or Snap Food Photo
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto font-medium leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-lg mx-auto font-medium leading-relaxed">
             Take a photo or upload an image to receive instant AI vision analysis, calorie calculation, and nutrition breakdown.
           </p>
         </div>
 
-        {/* Main Scanner Container */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs mb-8">
+        {/* Main Scanner Card - Full Width inside max-w-6xl */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs mb-8">
           
           {/* Mode Selector Tabs (Hidden when an image is selected) */}
           {!selectedImage && (
-            <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold mb-6">
+            <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold mb-6 max-w-xl mx-auto">
               <button
                 onClick={() => {
                   setActiveTab('upload');
@@ -277,7 +278,7 @@ export default function Home() {
             />
           ) : activeTab === 'upload' ? (
             /* Upload Dropzone Mode */
-            <div className="relative aspect-video max-h-96 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-emerald-500 flex flex-col items-center justify-center p-6 text-center transition-all group overflow-hidden">
+            <div className="relative aspect-[21/9] max-h-[420px] rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-emerald-500 flex flex-col items-center justify-center p-8 text-center transition-all group overflow-hidden">
               <input
                 type="file"
                 accept="image/*"
@@ -285,14 +286,14 @@ export default function Home() {
                 className="absolute inset-0 opacity-0 cursor-pointer z-10"
               />
               <div className="p-4 rounded-full bg-emerald-50 text-emerald-600 mb-3 group-hover:scale-110 transition-transform">
-                <Upload className="w-7 h-7" />
+                <Upload className="w-8 h-8" />
               </div>
-              <p className="text-sm font-bold text-slate-900 mb-1">Click or drag food image here</p>
+              <p className="text-base font-bold text-slate-900 mb-1">Click or drag food image here</p>
               <p className="text-xs text-slate-500 font-medium">Supports JPG, PNG, WEBP</p>
             </div>
           ) : (
             /* Camera Viewport Mode - Clean Light Theme */
-            <div className="relative aspect-video max-h-96 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+            <div className="relative aspect-[21/9] max-h-[420px] rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
               <video
                 ref={videoRef}
                 playsInline
@@ -334,20 +335,20 @@ export default function Home() {
 
           {/* Sample Preset Photos (Only shown when no image is selected) */}
           {!selectedImage && (
-            <div className="mt-6 pt-4 border-t border-slate-100">
-              <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase mb-2.5 block">
+            <div className="mt-8 pt-6 border-t border-slate-100">
+              <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase mb-3 block">
                 Quick Sample Photos
               </span>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {presetSamples.map((sample, idx) => (
                   <button
                     key={idx}
                     onClick={() => handlePresetSelect(sample.url)}
                     disabled={isAnalyzing}
-                    className="p-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-emerald-500/50 text-left transition-all text-xs text-slate-700 flex items-center gap-2"
+                    className="p-3 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-500/50 text-left transition-all text-xs text-slate-700 flex items-center gap-3 shadow-2xs hover:shadow-xs"
                   >
-                    <img src={sample.url} alt={sample.name} className="w-8 h-8 rounded-lg object-cover" />
-                    <span className="truncate font-semibold">{sample.name}</span>
+                    <img src={sample.url} alt={sample.name} className="w-10 h-10 rounded-xl object-cover" />
+                    <span className="truncate font-bold text-slate-900">{sample.name}</span>
                   </button>
                 ))}
               </div>

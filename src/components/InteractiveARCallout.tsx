@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef } from 'react';
-import { Download, Sparkles } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Download, Sparkles, Maximize2, X } from 'lucide-react';
 import { ARCalloutItem } from '@/types/tracker';
 
 interface InteractiveARCalloutProps {
@@ -16,6 +17,8 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
   mealName = 'Scanned Meal',
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [annotatedDataUrl, setAnnotatedDataUrl] = useState<string | null>(null);
 
   // Helper to extract target dot coordinates (0-1000 scale)
   const getTargetDot = (item: ARCalloutItem) => {
@@ -106,11 +109,9 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
     return lines;
   };
 
-  // High-Resolution Export with Multi-Line Canvas Wrapping
-  const handleExportCleanPhoto = async () => {
-    if (!containerRef.current) return;
-
-    try {
+  // Helper to render high-res annotated canvas to Data URL
+  const renderAnnotatedCanvasDataUrl = (): Promise<string> => {
+    return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -122,7 +123,7 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
         canvas.height = h;
 
         const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        if (!ctx) return resolve(imageUrl);
 
         // Draw base photo
         ctx.drawImage(img, 0, 0, w, h);
@@ -134,7 +135,7 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
         const lineSpacing = fontSize * 1.25;
         const pillPaddingX = fontSize * 0.8;
         const pillPaddingY = fontSize * 0.5;
-        const maxTextWidth = Math.round(w / 6.5); // Max width per line before wrapping
+        const maxTextWidth = Math.round(w / 6.5);
         const marginPadding = Math.round(w / 40);
 
         ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
@@ -146,7 +147,6 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
           const labelText = item.name;
           const lines = wrapCanvasText(ctx, labelText, maxTextWidth);
 
-          // Calculate wrapped box dimensions
           let maxLineWidth = 0;
           lines.forEach((l) => {
             const lw = ctx.measureText(l).width;
@@ -156,7 +156,6 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
           const pillWidth = maxLineWidth + pillPaddingX * 2;
           const pillHeight = lines.length * lineSpacing + pillPaddingY * 2;
 
-          // Compute clamped badge position so text stays inside canvas borders
           let badgeX = (pos.x / 1000) * w;
           if (pos.x < 500) {
             badgeX = Math.max(marginPadding, Math.min(dotX - 40, badgeX));
@@ -207,15 +206,28 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
           });
         });
 
-        // Trigger browser download
-        const dataUrl = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.download = `NUTRI_AI_Annotated_${mealName.replace(/\s+/g, '_')}.png`;
-        link.href = dataUrl;
-        link.click();
+        resolve(canvas.toDataURL('image/png'));
       };
 
       img.src = imageUrl;
+    });
+  };
+
+  // Open Fullscreen Lightbox displaying the FULL ANNOTATED image
+  const handleOpenAnnotatedLightbox = async () => {
+    const dataUrl = await renderAnnotatedCanvasDataUrl();
+    setAnnotatedDataUrl(dataUrl);
+    setIsFullscreen(true);
+  };
+
+  // High-Resolution Export with Multi-Line Canvas Wrapping
+  const handleExportCleanPhoto = async () => {
+    try {
+      const dataUrl = await renderAnnotatedCanvasDataUrl();
+      const link = document.createElement('a');
+      link.download = `NUTRI_AI_Annotated_${mealName.replace(/\s+/g, '_')}.png`;
+      link.href = dataUrl;
+      link.click();
     } catch (e) {
       console.error('Error exporting annotated photo:', e);
     }
@@ -225,7 +237,7 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
     <div className="relative w-full rounded-3xl overflow-hidden bg-white border border-slate-200 shadow-xl mb-6">
       
       {/* Top Header Bar */}
-      <div className="p-3 px-5 bg-white border-b border-slate-100 flex items-center justify-between">
+      <div className="p-3 px-5 bg-white border-b border-slate-100 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="p-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200">
             <Sparkles className="w-3.5 h-3.5" />
@@ -235,18 +247,28 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
           </span>
         </div>
 
-        <button
-          onClick={handleExportCleanPhoto}
-          className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-xs"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Save Image</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleOpenAnnotatedLightbox}
+            className="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>View Image</span>
+          </button>
+
+          <button
+            onClick={handleExportCleanPhoto}
+            className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Save Image</span>
+          </button>
+        </div>
       </div>
 
-      {/* Photo Viewport: Natural Image Aspect Ratio Wrapper */}
-      <div className="w-full flex items-center justify-center p-2 sm:p-4 bg-slate-950">
-        <div ref={containerRef} className="relative inline-block max-w-full max-h-[650px] rounded-2xl overflow-hidden shadow-2xl">
+      {/* Photo Viewport: Clean Light Theme Wrapper */}
+      <div className="w-full flex items-center justify-center p-2 sm:p-4 bg-slate-50">
+        <div ref={containerRef} className="relative inline-block max-w-full max-h-[650px] rounded-2xl overflow-hidden shadow-md">
           
           {/* Base Photo */}
           <img
@@ -310,6 +332,32 @@ export const InteractiveARCallout: React.FC<InteractiveARCalloutProps> = ({
 
         </div>
       </div>
+
+      {/* Fullscreen Lightbox Modal displaying the FULL ANNOTATED IMAGE */}
+      <AnimatePresence>
+        {isFullscreen && annotatedDataUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-8"
+            onClick={() => setIsFullscreen(false)}
+          >
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="absolute top-6 right-6 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={annotatedDataUrl}
+              alt="Full Size Annotated Callout Meal Photo"
+              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

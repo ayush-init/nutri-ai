@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, RefreshCw, AlertCircle, Maximize2 } from 'lucide-react';
 
 interface AIScannerViewerProps {
   imageUrl: string;
@@ -20,6 +20,8 @@ export const AIScannerViewer: React.FC<AIScannerViewerProps> = ({
   onReset,
   onRetry,
 }) => {
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
   return (
     <div className="relative w-full mx-auto">
       
@@ -32,7 +34,7 @@ export const AIScannerViewer: React.FC<AIScannerViewerProps> = ({
         className="relative rounded-3xl overflow-hidden bg-slate-50 border border-slate-200/90 shadow-md group transition-all"
       >
         {/* Base Image Container */}
-        <div className="relative w-full aspect-video max-h-[480px] flex items-center justify-center overflow-hidden bg-slate-50">
+        <div className="relative w-full aspect-[21/9] sm:aspect-video max-h-[520px] flex items-center justify-center overflow-hidden bg-slate-50">
           <img
             src={imageUrl}
             alt="Scanned Food"
@@ -41,8 +43,18 @@ export const AIScannerViewer: React.FC<AIScannerViewerProps> = ({
             }`}
           />
 
-          {/* Minimalist Floating Top-Right X Button */}
-          <div className="absolute top-3 right-3 z-30">
+          {/* Minimalist Floating Top-Right Controls */}
+          <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+            {!isAnalyzing && (
+              <button
+                onClick={() => setIsFullscreen(true)}
+                className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-emerald-700 border border-slate-200 shadow-md transition-all group/btn"
+                title="View Full Image"
+              >
+                <Maximize2 className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+              </button>
+            )}
+
             <button
               onClick={onReset}
               className="p-2 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-rose-600 border border-slate-200 shadow-md transition-all group/btn"
@@ -90,6 +102,32 @@ export const AIScannerViewer: React.FC<AIScannerViewerProps> = ({
           </div>
         )}
       </motion.div>
+
+      {/* Fullscreen Lightbox Modal */}
+      <AnimatePresence>
+        {isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-8"
+            onClick={() => setIsFullscreen(false)}
+          >
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="absolute top-6 right-6 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={imageUrl}
+              alt="Full Size Meal Photo"
+              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
